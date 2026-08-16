@@ -21,3 +21,7 @@ output "subnet_a_id" {
 output "subnet_b_id" {
   value = module.eks.subnet_b_id
 }
+
+output "internet_gateway_id" {
+  value = module.eks.internet_gateway_id
+}

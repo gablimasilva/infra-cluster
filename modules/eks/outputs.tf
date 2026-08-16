@@ -21,3 +21,7 @@ output "subnet_a_id" {
 output "subnet_b_id" {
   value = aws_subnet.subnet_b.id
 }
+
+output "internet_gateway_id" {
+  value = aws_internet_gateway.main.id
+}

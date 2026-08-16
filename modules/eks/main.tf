@@ -15,8 +15,14 @@ resource "aws_subnet" "subnet_a" {
 
   availability_zone = "sa-east-1a"
 
+  map_public_ip_on_launch = true
+
   tags = {
     Name = "vehicle-sales-subnet-a"
+
+    "kubernetes.io/cluster/${var.cluster_name}" = "shared"
+
+    "kubernetes.io/role/elb" = "1"
   }
 }
 
@@ -28,8 +34,14 @@ resource "aws_subnet" "subnet_b" {
 
   availability_zone = "sa-east-1b"
 
+  map_public_ip_on_launch = true
+
   tags = {
     Name = "vehicle-sales-subnet-b"
+
+    "kubernetes.io/cluster/${var.cluster_name}" = "shared"
+
+    "kubernetes.io/role/elb" = "1"
   }
 }
 
@@ -56,9 +68,38 @@ resource "aws_iam_role" "eks_role" {
 
 resource "aws_iam_role_policy_attachment" "eks_cluster_policy" {
 
-  role       = aws_iam_role.eks_role.name
+  role = aws_iam_role.eks_role.name
 
   policy_arn = "arn:aws:iam::aws:policy/AmazonEKSClusterPolicy"
+}
+
+resource "aws_security_group" "eks" {
+
+  name = "vehicle-sales-eks-sg"
+
+  vpc_id = aws_vpc.main.id
+
+  ingress {
+
+    from_port = 0
+    to_port   = 0
+
+    protocol = "-1"
+
+    self = true
+  }
+
+  egress {
+
+    from_port = 0
+    to_port   = 0
+
+    protocol = "-1"
+
+    cidr_blocks = [
+      "0.0.0.0/0"
+    ]
+  }
 }
 
 resource "aws_eks_cluster" "cluster" {
@@ -82,31 +123,6 @@ resource "aws_eks_cluster" "cluster" {
   depends_on = [
     aws_iam_role_policy_attachment.eks_cluster_policy
   ]
-}
-
-resource "aws_security_group" "eks" {
-
-  name = "vehicle-sales-eks-sg"
-
-  vpc_id = aws_vpc.main.id
-
-  ingress {
-    from_port = 0
-    to_port = 0
-    protocol = "-1"
-
-    self = true
-  }
-
-  egress {
-    from_port = 0
-    to_port = 0
-    protocol = "-1"
-
-    cidr_blocks = [
-      "0.0.0.0/0"
-    ]
-  }
 }
 
 resource "aws_iam_role" "node_group_role" {
@@ -134,24 +150,21 @@ resource "aws_iam_role_policy_attachment" "worker_node_policy" {
 
   role = aws_iam_role.node_group_role.name
 
-  policy_arn =
-    "arn:aws:iam::aws:policy/AmazonEKSWorkerNodePolicy"
+  policy_arn = "arn:aws:iam::aws:policy/AmazonEKSWorkerNodePolicy"
 }
 
 resource "aws_iam_role_policy_attachment" "cni_policy" {
 
   role = aws_iam_role.node_group_role.name
 
-  policy_arn =
-    "arn:aws:iam::aws:policy/AmazonEKS_CNI_Policy"
+  policy_arn = "arn:aws:iam::aws:policy/AmazonEKS_CNI_Policy"
 }
 
 resource "aws_iam_role_policy_attachment" "ecr_policy" {
 
   role = aws_iam_role.node_group_role.name
 
-  policy_arn =
-    "arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly"
+  policy_arn = "arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly"
 }
 
 resource "aws_eks_node_group" "main" {
@@ -185,4 +198,39 @@ resource "aws_eks_node_group" "main" {
     aws_iam_role_policy_attachment.cni_policy,
     aws_iam_role_policy_attachment.ecr_policy
   ]
+}
+
+resource "aws_internet_gateway" "main" {
+
+  vpc_id = aws_vpc.main.id
+
+  tags = {
+    Name = "vehicle-sales-igw"
+  }
+}
+
+resource "aws_route_table" "public" {
+
+  vpc_id = aws_vpc.main.id
+
+  route {
+
+    cidr_block = "0.0.0.0/0"
+
+    gateway_id = aws_internet_gateway.main.id
+  }
+}
+
+resource "aws_route_table_association" "subnet_a" {
+
+  subnet_id = aws_subnet.subnet_a.id
+
+  route_table_id = aws_route_table.public.id
+}
+
+resource "aws_route_table_association" "subnet_b" {
+
+  subnet_id = aws_subnet.subnet_b.id
+
+  route_table_id = aws_route_table.public.id
 }
