@@ -190,7 +190,7 @@ resource "aws_eks_node_group" "main" {
   }
 
   instance_types = [
-    "t3.medium"
+    "t3.micro"
   ]
 
   depends_on = [
